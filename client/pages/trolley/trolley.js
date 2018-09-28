@@ -152,6 +152,8 @@ Page({
     }
   },
 
+  // 创建事件函数并绑定至 “编辑” 页面中的加减号，并识别用户点击的是加号还是减号，以及点击的是哪个商品
+  // 基于用户点击的行为更改点击商品的数量。若数量为 0，则自动从购物车中删除
   adjustTrolleyProductCount(event) {
     let trolleyCheckMap = this.data.trolleyCheckMap
     let trolleyList = this.data.trolleyList
@@ -185,7 +187,7 @@ Page({
       }
     }
 
-    // 调整结算总价
+    // 重新计算购物车价格
     let trolleyAccount = this.calcAccount(trolleyList, trolleyCheckMap)
 
     if (!trolleyList.length) {
@@ -193,6 +195,7 @@ Page({
       this.updateTrolley()
     }
 
+    // 数据同步至前端页面
     this.setData({
       trolleyAccount,
       trolleyList,
@@ -200,12 +203,13 @@ Page({
     })
   },
 
+  // 将购物车信息同步至服务器
   updateTrolley() {
     wx.showLoading({
       title: '更新购物车数据...',
     })
     let trolleyList = this.data.trolleyList
-    
+
     qcloud.request({
       url: config.service.updateTrolley,
       method: 'POST',
@@ -232,6 +236,54 @@ Page({
         wx.showToast({
           icon: 'none',
           title: '更新购物车失败'
+        })
+      }
+    })
+  },
+
+  // 结算逻辑
+  onTapPay() {
+    if (!this.data.trolleyAccount) return
+    wx.showLoading({
+      title: '结算中...',
+    })
+    let trolleyCheckMap = this.data.trolleyCheckMap
+    let trolleyList = this.data.trolleyList
+
+    // 通过 filter 筛选出需要付费的商品 
+    // 使用双感叹号使 trolleyCheckMap[product.id] 变成布尔值
+    let needToPayProductList = trolleyList.filter(product => {
+      return !!trolleyCheckMap[product.id]
+    })
+
+    // 请求后台,调用API接口实现购买
+    qcloud.request({
+      url: config.service.addOrder,
+      login: true,
+      method: 'POST',
+      data: {
+        list: needToPayProductList
+      },
+      success: result => {
+        wx.hideLoading()
+        let data = result.data
+        if (!data.code) {
+          wx.showToast({
+            title: '结算成功',
+          })
+          this.getTrolley()
+        } else {
+          wx.showToast({
+            icon: 'none',
+            title: '结算失败',
+          })
+        }
+      },
+      fail: () => {
+        wx.hideLoading()
+        wx.showToast({
+          icon: 'none',
+          title: '结算失败',
         })
       }
     })
