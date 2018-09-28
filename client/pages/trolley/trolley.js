@@ -18,9 +18,9 @@ Page({
     locationAuthType: app.data.locationAuthType,
     trolleyList: [], // 购物车商品列表
     trolleyCheckMap: [], // 购物车中选中的id哈希表
-    trolleyAccount: 45, // 购物车结算总价
+    trolleyAccount: 0, // 购物车结算总价
     isTrolleyEdit: false, // 购物车是否处于编辑状态
-    isTrolleyTotalCheck: true, // 购物车中商品是否全选
+    isTrolleyTotalCheck: false, // 购物车中商品是否全选
   },
 
   onTapLogin: function () {
@@ -51,7 +51,7 @@ Page({
       login: true,
       success: result => {
         wx.hideLoading()
-        console.log(result)
+        // console.log(result)
         if (!result.data.code) {
           this.setData({
             trolleyList: result.data.data
@@ -70,6 +70,123 @@ Page({
           title: '数据刷新失败',
         })
       }
+    })
+  },
+
+  // 单个商品点击逻辑
+  onTapCheckSingle(event) {
+    let checkId = event.currentTarget.dataset.id
+    let trolleyCheckMap = this.data.trolleyCheckMap
+    let trolleyList = this.data.trolleyList
+    let isTrolleyTotalCheck = this.data.isTrolleyTotalCheck
+    let trolleyAccount = this.data.trolleyAccount
+    let numTotalProduct
+    let numCheckedProduct = 0
+
+    // 单项商品被选中/取消
+    trolleyCheckMap[checkId] = !trolleyCheckMap[checkId]
+
+    // 判断选中的商品个数是否需商品总数相等
+    numTotalProduct = trolleyList.length
+    trolleyCheckMap.forEach(checked => {
+      numCheckedProduct = checked ? numCheckedProduct + 1 : numCheckedProduct
+    })
+
+    // 是否全选
+    isTrolleyTotalCheck = (numTotalProduct === numCheckedProduct) ? true : false
+
+    // 计算选中的商品总价
+    trolleyAccount = this.calcAccount(trolleyList, trolleyCheckMap)
+
+    this.setData({
+      trolleyCheckMap,
+      isTrolleyTotalCheck,
+      trolleyAccount
+    })
+  },
+
+  // 全选商品点击逻辑
+  onTapCheckTotal(event) {
+    let trolleyCheckMap = this.data.trolleyCheckMap
+    let trolleyList = this.data.trolleyList
+    let isTrolleyTotalCheck = this.data.isTrolleyTotalCheck
+    let trolleyAccount = this.data.trolleyAccount
+    
+    // 全选按钮被选中/取消
+    isTrolleyTotalCheck = !isTrolleyTotalCheck
+
+    // 遍历并修改所有商品的状态
+    trolleyList.forEach(product => {
+      trolleyCheckMap[product.id] = isTrolleyTotalCheck
+    })
+
+    // 计算全选的商品总价
+    trolleyAccount = this.calcAccount(trolleyList, trolleyCheckMap)
+
+    this.setData({
+      isTrolleyTotalCheck,
+      trolleyCheckMap,
+      trolleyAccount
+    })
+  },
+
+  // 计算选中商品的总价，在单个商品点击和全选点击时调用该函数，并更新价格到前端页面上
+  calcAccount(trolleyList, trolleyCheckMap) {
+    let account = 0
+    trolleyList.forEach(product => {
+      account = trolleyCheckMap[product.id] ? account + product.price * product.count : account
+    })
+    return account
+  },
+
+  onTapEditTrolley() {
+    let isTrolleyEdit = this.data.isTrolleyEdit
+
+    this.setData({
+      isTrolleyEdit: !isTrolleyEdit
+    })
+    
+  },
+
+  adjustTrolleyProductCount(event) {
+    let trolleyCheckMap = this.data.trolleyCheckMap
+    let trolleyList = this.data.trolleyList
+    let dataset = event.currentTarget.dataset
+    let adjustType = dataset.type
+    let productId = dataset.id
+    let product
+    let index
+
+    for (index = 0; index < trolleyList.length; index++) {
+      if (productId === trolleyList[index].id) {
+        product = trolleyList[index]
+        break
+      }
+    }
+
+    if (product) {
+      if (adjustType === 'add') {
+        // 点击加号
+        product.count++
+      } else {
+        // 点击减号
+        if (product.count <= 1) {
+          // 商品数量不超过1，点击减号相当于删除
+          delete trolleyCheckMap[productId]
+          trolleyList.splice(index, 1)
+        } else {
+          // 商品数量大于1
+          product.count--
+        }
+      }
+    }
+
+    // 调整结算总价
+    let trolleyAccount = this.calcAccount(trolleyList, trolleyCheckMap)
+    this.setData({
+      trolleyAccount,
+      trolleyList,
+      trolleyCheckMap
     })
   },
 

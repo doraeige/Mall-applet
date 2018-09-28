@@ -77,7 +77,7 @@ Page({
         method: 'PUT',
         data: product,
         success: result => {
-          console.log(result)
+          // console.log(result)
           if (!result.data.code) {
             wx.showToast({
               title: '已添加到购物车',
